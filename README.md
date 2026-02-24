@@ -17,7 +17,7 @@ Markdownファイルをプレゼンスライドとして表示する、ビルド
 
 ## 使い方
 
-1. `index.html` をブラウザで開く（またはGitHub Pagesで公開して開く）
+1. `index.html` をブラウザで開く
 2. 次のどちらかでMarkdownを読み込む
    - `.md を開く`: 単一Markdown
    - `フォルダを開く`: Markdown + 画像などを含むフォルダ全体
@@ -28,14 +28,6 @@ Markdownファイルをプレゼンスライドとして表示する、ビルド
 
 - フォルダ読み込み時、Markdown内の相対パス画像（例: `./images/a.png`）を表示できます。
 - 単一 `.md` 読み込み時は、ローカル相対パス画像はブラウザ制約で解決できないため、URL画像またはフォルダ読み込みを使ってください。
-
-## GitHub Pages 公開手順（簡易）
-
-1. このリポジトリをGitHubへpush
-2. GitHubの `Settings` → `Pages`
-3. `Deploy from a branch` を選択
-4. ブランチ（例: `main`）/ ルート `/` を指定して保存
-5. 数分後に公開URLへアクセス
 
 ## サンプル
 
