@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Markdownスライドビューア</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar__title">
+          <h1>Markdownスライドビューア</h1>
+        </div>
+        <div class="topbar__controls">
+          <label class="field">
+            <span>.md を開く</span>
+            <input id="markdownFileInput" type="file" accept=".md,text/markdown" />
+          </label>
+          <label class="field">
+            <span>フォルダを開く</span>
+            <input id="folderInput" type="file" webkitdirectory multiple />
+          </label>
+          <label class="field field--grow">
+            <span>Markdown選択（フォルダ読込時）</span>
+            <select id="markdownSelect" disabled>
+              <option value="">.md ファイルを選択</option>
+            </select>
+          </label>
+          <label class="checkbox">
+            <input id="pageNumberToggle" type="checkbox" checked />
+            <span>ページ番号表示</span>
+          </label>
+          <button id="fullscreenButton" type="button" class="button button--ghost">フルスクリーン</button>
+          <button id="printButton" type="button">PDF出力（印刷）</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar__section">
+            <h2>操作</h2>
+            <div class="nav-buttons">
+              <button id="prevButton" type="button">前へ</button>
+              <button id="nextButton" type="button">次へ</button>
+            </div>
+            <p id="slideCounter" class="muted">0 / 0</p>
+            <p class="muted">キーボード: ← → / F / Esc</p>
+          </div>
+          <div class="sidebar__section">
+            <h2>スライド</h2>
+            <ol id="thumbnailList" class="thumbnail-list"></ol>
+          </div>
+        </aside>
+
+        <section class="viewer">
+          <div id="emptyState" class="empty-state">
+            <h2>Markdownを読み込んで開始</h2>
+            <p>
+              `#` をタイトルスライド、`##` を各ページ、`###` 以降をページ内段落として扱います。
+            </p>
+            <p>箇条書き・表・画像（相対パス）はフォルダ読込時に表示できます。</p>
+          </div>
+          <div id="presentationRoot" class="presentation-root" aria-live="polite"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="./app.js" type="module"></script>
+  </body>
+  </html>
