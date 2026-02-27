@@ -1,6 +1,6 @@
 # Markdown Presentation (Static Web App)
 
-Markdownファイルをプレゼンスライドとして表示する、ビルド不要の静的Webアプリです。`index.html` をGitHub Pagesで公開して使えます。
+Markdownファイルをプレゼンスライドとして表示する、ビルド不要の静的Webアプリです。
 
 ## 対応している変換ルール
 
@@ -31,4 +31,4 @@ Markdownファイルをプレゼンスライドとして表示する、ビルド
 
 ## 注意
 
- - PDFエクスポートは未完成です
+ - PDFエクスポートは未完成です。Chromeではある程度動作しますが、Safari等では正しく機能しません。

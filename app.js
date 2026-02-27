@@ -8,13 +8,14 @@ const state = {
     markdownPath: "",
     resolveAssetUrl: (src) => src,
   },
-  debugLayout: true,
+  debugLayout: false,
 };
 
 const dom = {
   markdownFileInput: document.getElementById("markdownFileInput"),
   folderInput: document.getElementById("folderInput"),
   markdownSelect: document.getElementById("markdownSelect"),
+  aspectRatioSelect: document.getElementById("aspectRatioSelect"),
   pageNumberToggle: document.getElementById("pageNumberToggle"),
   fullscreenButton: document.getElementById("fullscreenButton"),
   printButton: document.getElementById("printButton"),
@@ -40,23 +41,37 @@ initialize();
 
 function initialize() {
   const savedToggle = localStorage.getItem("showPageNumbers");
+  const savedAspectRatio = localStorage.getItem("slideAspectRatio");
   if (savedToggle !== null) {
     dom.pageNumberToggle.checked = savedToggle === "true";
   }
+  if (savedAspectRatio && dom.aspectRatioSelect.querySelector(`option[value="${savedAspectRatio}"]`)) {
+    dom.aspectRatioSelect.value = savedAspectRatio;
+  }
   syncPageNumberToggle();
+  applyAspectRatio(dom.aspectRatioSelect.value);
 
   dom.markdownFileInput.addEventListener("change", onMarkdownFilePicked);
   dom.folderInput.addEventListener("change", onFolderPicked);
   dom.markdownSelect.addEventListener("change", onMarkdownSelectionChanged);
+  dom.aspectRatioSelect.addEventListener("change", () => {
+    localStorage.setItem("slideAspectRatio", dom.aspectRatioSelect.value);
+    applyAspectRatio(dom.aspectRatioSelect.value);
+    scheduleRelayout();
+  });
   dom.pageNumberToggle.addEventListener("change", () => {
     localStorage.setItem("showPageNumbers", String(dom.pageNumberToggle.checked));
     syncPageNumberToggle();
   });
-  dom.printButton.addEventListener("click", () => window.print());
+  dom.printButton.addEventListener("click", () => {
+    window.print();
+  });
   dom.fullscreenButton.addEventListener("click", toggleFullscreenPresentation);
   dom.prevButton.addEventListener("click", () => moveSlide(-1));
   dom.nextButton.addEventListener("click", () => moveSlide(1));
   document.addEventListener("fullscreenchange", onFullscreenChanged);
+  window.addEventListener("beforeprint", preparePrintImageFit);
+  window.addEventListener("afterprint", cleanupPrintImageFit);
   window.addEventListener("resize", () => {
     scheduleRelayout();
   });
@@ -96,6 +111,89 @@ function initialize() {
 
 function syncPageNumberToggle() {
   document.body.classList.toggle("hide-page-numbers", !dom.pageNumberToggle.checked);
+}
+
+function applyAspectRatio(value) {
+  const [wRaw, hRaw] = String(value || "16:9").split(":");
+  const w = Number(wRaw);
+  const h = Number(hRaw);
+  const safeW = Number.isFinite(w) && w > 0 ? w : 16;
+  const safeH = Number.isFinite(h) && h > 0 ? h : 9;
+  document.documentElement.style.setProperty("--slide-ratio-w", String(safeW));
+  document.documentElement.style.setProperty("--slide-ratio-h", String(safeH));
+}
+
+if (typeof window !== "undefined") {
+  window.__mdSlideViewerTest = {
+    loadMarkdown(markdown) {
+      loadMarkdown(markdown, {
+        markdownPath: "test.md",
+        resolveAssetUrl: (src) => src,
+      });
+      scheduleRelayout();
+    },
+    setAspectRatio(value) {
+      if (dom.aspectRatioSelect.querySelector(`option[value="${value}"]`)) {
+        dom.aspectRatioSelect.value = value;
+      }
+      applyAspectRatio(value);
+      scheduleRelayout();
+    },
+    setDebug(enabled) {
+      state.debugLayout = Boolean(enabled);
+    },
+    goToSlide(indexOneBased) {
+      const idx = Math.max(1, Number(indexOneBased || 1)) - 1;
+      setCurrentSlide(idx);
+      scheduleRelayout();
+    },
+    getLayoutSnapshot(activeOnly = false) {
+      const all = Array.from(document.querySelectorAll(".slide"));
+      const targetSlides = activeOnly ? all.filter((s) => s.classList.contains("is-active")) : all;
+      const slides = targetSlides.map((slideEl) => {
+        const contentEl = slideEl.querySelector(".slide__content");
+        const contentRect = contentEl?.getBoundingClientRect();
+        const figures = Array.from(slideEl.querySelectorAll(".md-figure")).map((figure) => {
+          const figRect = figure.getBoundingClientRect();
+          const img = figure.querySelector("img");
+          const cap = figure.querySelector(".md-figure__caption");
+          const imgRect = img?.getBoundingClientRect();
+          const capRect = cap?.getBoundingClientRect();
+          const captionGap =
+            imgRect && capRect ? Math.max(0, capRect.top - imgRect.bottom) : 0;
+          const inBounds = contentRect
+            ? figRect.left >= contentRect.left - 1 &&
+              figRect.right <= contentRect.right + 1 &&
+              figRect.top >= contentRect.top - 1 &&
+              figRect.bottom <= contentRect.bottom + 1
+            : true;
+          return {
+            figureW: round1(figRect.width),
+            figureH: round1(figRect.height),
+            imgW: round1(imgRect?.width || 0),
+            imgH: round1(imgRect?.height || 0),
+            captionText: cap?.textContent || "",
+            captionH: round1(capRect?.height || 0),
+            captionGap: round1(captionGap),
+            captionVisible: !!(cap && capRect && capRect.height > 0),
+            inBounds,
+          };
+        });
+        const overflow =
+          !contentEl || contentEl.clientHeight === 0
+            ? 0
+            : Math.max(0, contentEl.scrollHeight - contentEl.clientHeight);
+        return {
+          index: Number(slideEl.dataset.index || 0) + 1,
+          title: slideEl.querySelector(".slide__header h2")?.textContent || "",
+          overflow: round1(overflow),
+          figureCount: figures.length,
+          figures,
+        };
+      });
+      return { slides };
+    },
+  };
 }
 
 async function onMarkdownFilePicked(event) {
@@ -491,14 +589,14 @@ function decorateImageWithCaption(img) {
 
   if (isParagraphWithOnlyThisImage(parent, img)) {
     parent.replaceWith(figure);
-    inner.append(img, figcaption);
-    figure.append(inner);
+    inner.append(img);
+    figure.append(inner, figcaption);
     return;
   }
 
   img.replaceWith(figure);
-  inner.append(img, figcaption);
-  figure.append(inner);
+  inner.append(img);
+  figure.append(inner, figcaption);
 }
 
 function isParagraphWithOnlyThisImage(parent, img) {
@@ -562,38 +660,6 @@ function applyAutoFitToSlides() {
     if (!inner || !content) return;
     if (inner.clientHeight < 10) return;
     optimizeFigureGroups(content, slideEl.classList.contains("slide--title"));
-
-    // First try to use larger typography when the slide is very sparse.
-    const freeRatio = Math.max(0, 1 - inner.scrollHeight / inner.clientHeight);
-    if (freeRatio > 0.28) {
-      slideEl.classList.add("fit-loose");
-    }
-
-    // If content still overflows, progressively tighten spacing/typography.
-    if (inner.scrollHeight > inner.clientHeight + 2 || content.scrollHeight > content.clientHeight + 2) {
-      slideEl.classList.remove("fit-loose");
-      slideEl.classList.add("fit-tight-1");
-    }
-    if (inner.scrollHeight > inner.clientHeight + 2 || content.scrollHeight > content.clientHeight + 2) {
-      slideEl.classList.add("fit-tight-2");
-    }
-
-    // Final guardrail: if still overflowing (often image-heavy slides after zoom changes),
-    // shrink image max height dynamically for this slide.
-    let guard = 0;
-    while (
-      guard < 8 &&
-      (inner.scrollHeight > inner.clientHeight + 2 || content.scrollHeight > content.clientHeight + 2)
-    ) {
-      guard += 1;
-      const isTitle = slideEl.classList.contains("slide--title");
-      const floor = isTitle ? 28 : 44;
-      const current = Number.parseFloat(
-        getComputedStyle(slideEl).getPropertyValue("--dynamic-image-max-h") || "0"
-      );
-      const next = current > 0 ? Math.max(floor, current - 2) : (isTitle ? 42 : 64);
-      slideEl.style.setProperty("--dynamic-image-max-h", `${next}%`);
-    }
 
     fitFigureBlocks(slideEl, inner, content);
     logSlideLayoutDebug(slideEl, inner, content);
@@ -753,6 +819,115 @@ function scheduleRelayout() {
   }, 220);
 }
 
+function preparePrintImageFit() {
+  document.body.classList.add("print-mode");
+  document.body.classList.add("print-prep");
+  // Ensure print-like layout is measurable before opening the dialog.
+  void document.body.offsetHeight;
+  const slides = Array.from(document.querySelectorAll(".slide"));
+
+  for (const slide of slides) {
+    const content = slide.querySelector(".slide__content");
+    if (!content) continue;
+    const figures = Array.from(content.querySelectorAll(".md-figure"));
+    if (!figures.length) continue;
+
+    for (const img of content.querySelectorAll("img")) {
+      img.style.removeProperty("--print-single-max-h");
+    }
+
+    setPrintFigureScale(figures, 1);
+    const totalAtScale1 = content.scrollHeight;
+    const available = content.clientHeight || 0;
+    if (!available) continue;
+
+    // Measure non-media (text/table/header within content flow).
+    content.classList.add("print-measure-no-media");
+    void content.offsetHeight;
+    const fixedHeight = content.scrollHeight;
+    content.classList.remove("print-measure-no-media");
+    void content.offsetHeight;
+
+    // If the page overflows even without media, image scaling cannot fix it.
+    if (fixedHeight - available > 1) {
+      setPrintFigureScale(figures, 1);
+      continue;
+    }
+
+    if (figures.length === 1 && fixedHeight / available < 0.75) {
+      const img = figures[0].querySelector("img");
+      if (!img) continue;
+      let cap = Math.max(120, Math.floor((available - fixedHeight) * 0.98));
+      img.style.setProperty("--print-single-max-h", `${cap}px`);
+      let guard = 0;
+      while (guard < 8 && !printSlideFits(content, figures)) {
+        guard += 1;
+        cap = Math.max(64, Math.floor(cap * 0.92));
+        img.style.setProperty("--print-single-max-h", `${cap}px`);
+      }
+      continue;
+    }
+
+    const mediaHeightAtScale1 = Math.max(1, totalAtScale1 - fixedHeight);
+    const rawTarget = (available - fixedHeight) / mediaHeightAtScale1;
+    const minScale = 0.2;
+    const maxScale = 3;
+    let target = Math.max(minScale, Math.min(maxScale, rawTarget));
+    setPrintFigureScale(figures, target);
+
+    // Refine to largest fitting scale.
+    let low;
+    let high;
+    if (printSlideFits(content, figures)) {
+      low = target;
+      high = maxScale;
+    } else {
+      low = minScale;
+      high = target;
+      setPrintFigureScale(figures, low);
+      if (!printSlideFits(content, figures)) {
+        continue;
+      }
+    }
+
+    for (let i = 0; i < 12; i += 1) {
+      const mid = (low + high) / 2;
+      setPrintFigureScale(figures, mid);
+      if (printSlideFits(content, figures)) {
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+    setPrintFigureScale(figures, low);
+  }
+  document.body.classList.remove("print-prep");
+}
+
+function cleanupPrintImageFit() {
+  document.body.classList.remove("print-mode");
+  document.body.classList.remove("print-prep");
+  for (const figure of document.querySelectorAll(".slide__content .md-figure")) {
+    figure.style.removeProperty("--print-figure-scale");
+  }
+  for (const img of document.querySelectorAll(".slide__content img")) {
+    img.style.removeProperty("--print-single-max-h");
+  }
+}
+
+function setPrintFigureScale(figures, scale) {
+  for (const figure of figures) {
+    figure.style.setProperty("--print-figure-scale", String(scale));
+  }
+}
+
+function printSlideFits(content, figures) {
+  if (!content) return true;
+  if (content.scrollHeight > content.clientHeight + 1) return false;
+  if (content.scrollWidth > content.clientWidth + 1) return false;
+  return true;
+}
+
 function resetFigureBlockSizing(slideEl) {
   slideEl.querySelectorAll(".md-figure").forEach((figure) => {
     figure.style.removeProperty("--figure-scale");
@@ -775,6 +950,10 @@ function fitFigureBlocks(slideEl, innerEl, contentEl) {
     figure.querySelector(".md-figure__inner")
   );
   if (figures.length === 0) return;
+  if (figures.length === 1) {
+    fitSingleFigureBlock(figures[0], innerEl, contentEl);
+    return;
+  }
 
   const isTitle = slideEl.classList.contains("slide--title");
   const minScale = isTitle ? 0.35 : 0.4;
@@ -815,13 +994,44 @@ function fitFigureBlocks(slideEl, innerEl, contentEl) {
   return;
 }
 
+function fitSingleFigureBlock(figure, innerEl, contentEl) {
+  const img = figure.querySelector("img");
+  if (!img) return;
+
+  img.style.width = "auto";
+  img.style.maxWidth = "96%";
+  img.style.maxHeight = "";
+
+  const minH = 120;
+  const maxH = Math.max(minH, Math.floor(contentEl.clientHeight * 0.98));
+  img.style.maxHeight = `${maxH}px`;
+
+  if (!slideOverflows(innerEl, contentEl, [figure])) {
+    return;
+  }
+
+  let low = minH;
+  let high = maxH;
+  for (let i = 0; i < 12; i += 1) {
+    const mid = (low + high) / 2;
+    img.style.maxHeight = `${Math.floor(mid)}px`;
+    if (slideOverflows(innerEl, contentEl, [figure])) {
+      high = mid;
+    } else {
+      low = mid;
+    }
+  }
+  img.style.maxHeight = `${Math.floor(low)}px`;
+}
+
 function applyFigureBlockScale(figures, scale) {
   for (const figure of figures) {
-    const inner = figure.querySelector(".md-figure__inner");
-    if (!inner) continue;
+    const img = figure.querySelector("img");
+    if (!img) continue;
+    figure.style.height = "";
     figure.style.setProperty("--figure-scale", String(scale));
-    const naturalHeight = inner.offsetHeight || inner.scrollHeight || 0;
-    figure.style.height = naturalHeight ? `${Math.ceil(naturalHeight * scale)}px` : "";
+    const pct = Math.max(8, Math.min(96, 96 * scale));
+    img.style.width = `${pct}%`;
   }
 }
 
@@ -842,11 +1052,8 @@ function figuresOverflowVisually(contentEl, figures) {
   const pad = 2;
 
   for (const figure of figures) {
-    const visual = figure.querySelector(".md-figure__inner");
-    if (!visual) continue;
-    const rect = visual.getBoundingClientRect();
+    const rect = figure.getBoundingClientRect();
     if (!rect.width || !rect.height) continue;
-
     if (
       rect.left < contentRect.left - pad ||
       rect.right > contentRect.right + pad ||

@@ -12,6 +12,8 @@
   --slide-h: 720px;
   --topbar-h: 86px;
   --global-type-scale: 2;
+  --slide-ratio-w: 16;
+  --slide-ratio-h: 9;
 }
 
 * {
@@ -132,6 +134,10 @@ select {
   padding: 10px;
   box-shadow: var(--shadow);
   height: fit-content;
+  max-height: calc(100dvh - var(--topbar-h) - 20px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   position: sticky;
   top: calc(var(--topbar-h) + 10px);
 }
@@ -140,6 +146,12 @@ select {
   margin-top: 16px;
   border-top: 1px solid var(--line);
   padding-top: 12px;
+}
+
+.sidebar__section:last-child {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar h2 {
@@ -173,7 +185,9 @@ select {
   list-style: none;
   display: grid;
   gap: 8px;
-  max-height: 58vh;
+  max-height: none;
+  min-height: 0;
+  flex: 1 1 auto;
   overflow: auto;
 }
 
@@ -234,9 +248,9 @@ select {
   position: relative;
   width: min(
     100%,
-    calc((100dvh - var(--topbar-h) - 28px) * 16 / 9)
+    calc((100dvh - var(--topbar-h) - 28px) * var(--slide-ratio-w) / var(--slide-ratio-h))
   );
-  aspect-ratio: 16 / 9;
+  aspect-ratio: calc(var(--slide-ratio-w) / var(--slide-ratio-h));
   margin: 0 auto;
   background:
     radial-gradient(circle at 10% 5%, rgba(210, 143, 63, 0.18), transparent 45%),
@@ -257,8 +271,8 @@ select {
   height: 100%;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  padding: var(--slide-pad-y, 26px) var(--slide-pad-x, 34px) var(--slide-pad-bottom, 20px);
-  gap: var(--slide-gap, 10px);
+  padding: 26px 34px 20px;
+  gap: 10px;
   --header-scale: 1;
   --title-header-scale: 1;
   --body-scale: 1;
@@ -282,7 +296,9 @@ select {
 
 .slide__content {
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable both-edges;
   padding-right: 6px;
 }
 
@@ -307,7 +323,7 @@ select {
 }
 
 .slide__content p {
-  margin: 0.35em 0 0.45em;
+  margin: 0.3em 0 0.25em;
 }
 
 .slide__content ul,
@@ -346,9 +362,8 @@ select {
 }
 
 .md-figure {
-  display: grid;
-  grid-template-columns: 1fr;
-  justify-items: center;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   margin: 0 auto 4px;
   width: 100%;
@@ -372,26 +387,24 @@ select {
 }
 
 .md-figure__inner {
-  display: grid;
-  justify-items: center;
-  align-content: start;
-  gap: 0;
-  transform-origin: center top;
-  transform: scale(var(--figure-scale));
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
   width: 100%;
   max-width: 100%;
 }
 
 .md-figure img {
   margin: 0;
-  width: 96%;
+  width: var(--figure-img-width, 96%);
   height: auto;
-  max-width: none;
+  max-width: 100%;
   max-height: none;
 }
 
 .md-figure__caption {
-  width: fit-content;
+  display: block;
+  width: auto;
   max-width: min(96%, 56ch);
   font-size: calc(0.92rem * var(--global-type-scale));
   line-height: 1.15;
@@ -399,8 +412,9 @@ select {
   text-align: center;
   word-break: break-word;
   overflow-wrap: anywhere;
-  margin-top: 1px;
+  margin-top: 0;
   padding-top: 0;
+  align-self: center;
 }
 
 .slide__footer {
@@ -449,46 +463,11 @@ select {
 }
 
 .slide.fit-tight-1 {
-  --slide-pad-y: 22px;
-  --slide-pad-x: 28px;
-  --slide-pad-bottom: 16px;
-  --slide-gap: 8px;
   --image-max-h: 58%;
-  --header-scale: 0.9;
-  --title-header-scale: 0.9;
-  --body-scale: 0.92;
-  --table-scale: 0.9;
-}
-.slide.fit-tight-1 .slide__content p,
-.slide.fit-tight-1 .slide__content li {
-  line-height: 1.4;
-}
-
-.slide.fit-tight-1 .slide__content th,
-.slide.fit-tight-1 .slide__content td {
-  padding: 6px 8px;
 }
 
 .slide.fit-tight-2 {
-  --slide-pad-y: 18px;
-  --slide-pad-x: 22px;
-  --slide-pad-bottom: 14px;
-  --slide-gap: 6px;
   --image-max-h: 48%;
-  --header-scale: 0.78;
-  --title-header-scale: 0.72;
-  --body-scale: 0.82;
-  --table-scale: 0.8;
-}
-.slide.fit-tight-2 .slide__content p,
-.slide.fit-tight-2 .slide__content li,
-.slide.fit-tight-2 .slide__content table {
-  line-height: 1.32;
-}
-
-.slide.fit-tight-2 .slide__content ul,
-.slide.fit-tight-2 .slide__content ol {
-  margin-left: 1em;
 }
 
 .slide.fit-tight-2 .title-meta__row {
@@ -497,10 +476,6 @@ select {
 }
 
 .slide.fit-loose {
-  --header-scale: 1.1;
-  --title-header-scale: 1.15;
-  --body-scale: 1.08;
-  --table-scale: 1.04;
 }
 
 .slide--title .slide__header {
@@ -636,6 +611,8 @@ select {
 
   .sidebar {
     position: static;
+    max-height: none;
+    overflow: visible;
   }
 
   .slide {
@@ -657,6 +634,26 @@ select {
   .md-figure-group {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+}
+
+/* Safari-specific stabilizers (keep scope minimal to avoid Chrome impact). */
+@supports (-webkit-touch-callout: none) {
+  .slide {
+    width: min(
+      100%,
+      calc((100vh - var(--topbar-h) - 28px) * var(--slide-ratio-w) / var(--slide-ratio-h))
+    );
+  }
+
+  .slide__content {
+    scrollbar-gutter: auto;
+    overflow-y: scroll;
+  }
+
+  body.is-fullscreen .slide {
+    width: min(100vw, calc(100vh * var(--slide-ratio-w) / var(--slide-ratio-h)));
+    height: min(100vh, calc(100vw * var(--slide-ratio-h) / var(--slide-ratio-w)));
   }
 }
 
@@ -688,8 +685,8 @@ body.is-fullscreen .presentation-root {
 }
 
 body.is-fullscreen .slide {
-  width: min(100vw, calc(100dvh * 16 / 9));
-  height: min(100dvh, calc(100vw * 9 / 16));
+  width: min(100vw, calc(100dvh * var(--slide-ratio-w) / var(--slide-ratio-h)));
+  height: min(100dvh, calc(100vw * var(--slide-ratio-h) / var(--slide-ratio-w)));
   aspect-ratio: auto;
   border-radius: 0;
   margin: 0;
@@ -699,10 +696,52 @@ body.is-fullscreen .slide__content {
   overflow: hidden;
 }
 
+/* Temporary layout used just before opening print dialog for reliable measurements. */
+body.print-prep .topbar,
+body.print-prep .sidebar,
+body.print-prep .empty-state {
+  display: none !important;
+}
+
+body.print-prep .workspace {
+  display: block;
+  padding: 0;
+}
+
+body.print-prep .presentation-root {
+  display: block;
+}
+
+body.print-prep .slide {
+  display: block !important;
+  width: 100vw;
+  height: 100vh;
+  aspect-ratio: auto;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+  overflow: hidden;
+}
+
+body.print-prep .slide__content.print-measure-no-media .md-figure,
+body.print-prep .slide__content.print-measure-no-media .md-figure-group {
+  display: none !important;
+}
+
+body.print-prep .md-figure img {
+  width: calc(96% * var(--print-figure-scale, 1));
+  max-width: none !important;
+  max-height: var(--print-single-max-h, none) !important;
+}
+
 @media print {
   html,
   body {
     background: #fff;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .topbar,
@@ -717,20 +756,25 @@ body.is-fullscreen .slide__content {
   }
 
   .presentation-root {
+    display: block;
     gap: 0;
   }
 
   .slide {
     display: block !important;
-    width: 100vw;
+    width: 100%;
     height: 100vh;
     aspect-ratio: auto;
     border: none;
     border-radius: 0;
     box-shadow: none;
     margin: 0;
+    overflow: hidden;
+    break-inside: avoid;
+    page-break-inside: avoid;
     page-break-after: always;
     break-after: page;
+    position: relative;
   }
 
   .slide:last-child {
@@ -738,7 +782,48 @@ body.is-fullscreen .slide__content {
     break-after: auto;
   }
 
+  .slide__inner {
+    height: 100%;
+    overflow: visible;
+  }
+
   .slide__content {
-    overflow: hidden;
+    overflow: visible;
+  }
+
+  .slide__content img {
+    max-height: 100% !important;
+    width: auto;
+    object-fit: contain;
+  }
+
+  .md-figure,
+  .md-figure-group {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .md-figure img {
+    width: calc(96% * var(--print-figure-scale, 1));
+    max-width: none !important;
+    max-height: var(--print-single-max-h, none) !important;
+  }
+}
+
+/* Safari print quirks: avoid dvh/vw and keep each slide isolated on a page. */
+@media print {
+  @supports (-webkit-touch-callout: none) {
+    .slide {
+      height: 100vh;
+      width: 100%;
+      contain: paint;
+      page-break-before: always;
+      break-before: page;
+    }
+
+    .slide:first-child {
+      page-break-before: auto;
+      break-before: auto;
+    }
   }
 }
