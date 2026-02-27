@@ -569,6 +569,7 @@ function rewriteImageUrls(rootElement, renderOptions) {
     );
     img.src = renderOptions.resolveAssetUrl(src) || src;
   });
+  normalizeListEmbeddedFigures(rootElement);
 }
 
 function decorateImageWithCaption(img) {
@@ -609,6 +610,39 @@ function isParagraphWithOnlyThisImage(parent, img) {
     return true;
   });
   return meaningful.length === 1 && meaningful[0] === img;
+}
+
+function normalizeListEmbeddedFigures(rootElement) {
+  const listItems = Array.from(rootElement.querySelectorAll("li"));
+  listItems.forEach((li) => {
+    const list = li.closest("ul, ol");
+    if (!list) return;
+
+    const figures = Array.from(li.children).filter(
+      (el) => el.classList?.contains("md-figure") || el.classList?.contains("md-figure-group")
+    );
+    if (!figures.length) return;
+
+    // Lift media blocks outside the list so slide-wide image fit/centering can apply.
+    let anchor = list;
+    figures.forEach((figure) => {
+      figure.remove();
+      anchor.after(figure);
+      anchor = figure;
+    });
+
+    const hasMeaningfulContent = Array.from(li.childNodes).some((node) => {
+      if (node.nodeType === Node.TEXT_NODE) return Boolean((node.textContent || "").trim());
+      if (node.nodeType !== Node.ELEMENT_NODE) return false;
+      const el = node;
+      if (el.tagName === "BR") return false;
+      if (el.classList?.contains("md-figure") || el.classList?.contains("md-figure-group")) return false;
+      return Boolean((el.textContent || "").trim()) || el.children.length > 0;
+    });
+    if (!hasMeaningfulContent) {
+      li.remove();
+    }
+  });
 }
 
 function setCurrentSlide(index) {
@@ -659,9 +693,11 @@ function applyAutoFitToSlides() {
     const content = slideEl.querySelector(".slide__content");
     if (!inner || !content) return;
     if (inner.clientHeight < 10) return;
+    clearScreenMediaSpacing(content);
     optimizeFigureGroups(content, slideEl.classList.contains("slide--title"));
 
     fitFigureBlocks(slideEl, inner, content);
+    applyScreenMediaCentering(content);
     logSlideLayoutDebug(slideEl, inner, content);
   });
 }
@@ -831,6 +867,7 @@ function preparePrintImageFit() {
     if (!content) continue;
     const figures = Array.from(content.querySelectorAll(".md-figure"));
     if (!figures.length) continue;
+    clearPrintMediaSpacing(content);
 
     for (const img of content.querySelectorAll("img")) {
       img.style.removeProperty("--print-single-max-h");
@@ -857,7 +894,9 @@ function preparePrintImageFit() {
     if (figures.length === 1 && fixedHeight / available < 0.75) {
       const img = figures[0].querySelector("img");
       if (!img) continue;
-      let cap = Math.max(120, Math.floor((available - fixedHeight) * 0.98));
+      const baseH = Math.max(1, Math.floor(img.getBoundingClientRect().height || 1));
+      const maxByScale = Math.floor(baseH * 2);
+      let cap = Math.max(120, Math.min(Math.floor((available - fixedHeight) * 0.98), maxByScale));
       img.style.setProperty("--print-single-max-h", `${cap}px`);
       let guard = 0;
       while (guard < 8 && !printSlideFits(content, figures)) {
@@ -865,13 +904,14 @@ function preparePrintImageFit() {
         cap = Math.max(64, Math.floor(cap * 0.92));
         img.style.setProperty("--print-single-max-h", `${cap}px`);
       }
+      applyPrintMediaCentering(content);
       continue;
     }
 
     const mediaHeightAtScale1 = Math.max(1, totalAtScale1 - fixedHeight);
     const rawTarget = (available - fixedHeight) / mediaHeightAtScale1;
     const minScale = 0.2;
-    const maxScale = 3;
+    const maxScale = 2;
     let target = Math.max(minScale, Math.min(maxScale, rawTarget));
     setPrintFigureScale(figures, target);
 
@@ -900,6 +940,7 @@ function preparePrintImageFit() {
       }
     }
     setPrintFigureScale(figures, low);
+    applyPrintMediaCentering(content);
   }
   document.body.classList.remove("print-prep");
 }
@@ -909,6 +950,12 @@ function cleanupPrintImageFit() {
   document.body.classList.remove("print-prep");
   for (const figure of document.querySelectorAll(".slide__content .md-figure")) {
     figure.style.removeProperty("--print-figure-scale");
+    figure.style.removeProperty("--print-media-extra-space-top");
+    figure.style.removeProperty("--print-media-extra-space-bottom");
+  }
+  for (const group of document.querySelectorAll(".slide__content .md-figure-group")) {
+    group.style.removeProperty("--print-media-extra-space-top");
+    group.style.removeProperty("--print-media-extra-space-bottom");
   }
   for (const img of document.querySelectorAll(".slide__content img")) {
     img.style.removeProperty("--print-single-max-h");
@@ -928,10 +975,28 @@ function printSlideFits(content, figures) {
   return true;
 }
 
+function clearPrintMediaSpacing(content) {
+  const blocks = content.querySelectorAll(".md-figure, .md-figure-group");
+  for (const block of blocks) {
+    block.style.removeProperty("--print-media-extra-space-top");
+    block.style.removeProperty("--print-media-extra-space-bottom");
+  }
+}
+
+function applyPrintMediaCentering(content) {
+  applyMediaCenteringByMeasuredSpace(content, "--print-media-extra-space-top", "--print-media-extra-space-bottom");
+}
+
 function resetFigureBlockSizing(slideEl) {
   slideEl.querySelectorAll(".md-figure").forEach((figure) => {
     figure.style.removeProperty("--figure-scale");
+    figure.style.removeProperty("--media-extra-space-top");
+    figure.style.removeProperty("--media-extra-space-bottom");
     figure.style.height = "";
+  });
+  slideEl.querySelectorAll(".md-figure-group").forEach((group) => {
+    group.style.removeProperty("--media-extra-space-top");
+    group.style.removeProperty("--media-extra-space-bottom");
   });
   slideEl.querySelectorAll(".md-figure img").forEach((img) => {
     img.style.maxHeight = "";
@@ -1000,17 +1065,18 @@ function fitSingleFigureBlock(figure, innerEl, contentEl) {
 
   img.style.width = "auto";
   img.style.maxWidth = "96%";
-  img.style.maxHeight = "";
+  img.style.maxHeight = "none";
 
-  const minH = 120;
-  const maxH = Math.max(minH, Math.floor(contentEl.clientHeight * 0.98));
+  const baseH = Math.max(1, Math.floor(img.getBoundingClientRect().height || img.naturalHeight || 1));
+  const viewportCap = Math.max(64, Math.floor(contentEl.clientHeight * 0.98));
+  const maxH = Math.max(48, Math.min(viewportCap, Math.floor(baseH * 2)));
   img.style.maxHeight = `${maxH}px`;
 
   if (!slideOverflows(innerEl, contentEl, [figure])) {
     return;
   }
 
-  let low = minH;
+  let low = 32;
   let high = maxH;
   for (let i = 0; i < 12; i += 1) {
     const mid = (low + high) / 2;
@@ -1022,6 +1088,76 @@ function fitSingleFigureBlock(figure, innerEl, contentEl) {
     }
   }
   img.style.maxHeight = `${Math.floor(low)}px`;
+  ensureSingleFigureMinPadding(figure, img, innerEl, contentEl, 18);
+}
+
+function clearScreenMediaSpacing(content) {
+  const blocks = content.querySelectorAll(".md-figure, .md-figure-group");
+  for (const block of blocks) {
+    block.style.removeProperty("--media-extra-space-top");
+    block.style.removeProperty("--media-extra-space-bottom");
+  }
+}
+
+function applyScreenMediaCentering(content) {
+  applyMediaCenteringByMeasuredSpace(content, "--media-extra-space-top", "--media-extra-space-bottom");
+}
+
+function applyMediaCenteringByMeasuredSpace(content, topVar, bottomVar) {
+  const blocks = Array.from(content.children).filter(
+    (el) => el.classList?.contains("md-figure") || el.classList?.contains("md-figure-group")
+  );
+  if (blocks.length !== 1) return;
+  const mediaBlock = blocks[0];
+  const metrics = getMediaRegionMetrics(content, mediaBlock);
+  if (!metrics) return;
+  const extra = metrics.extra;
+  if (extra < 6) return;
+  const top = Math.floor(extra / 2);
+  const bottom = extra - top;
+  mediaBlock.style.setProperty(topVar, `${top}px`);
+  mediaBlock.style.setProperty(bottomVar, `${bottom}px`);
+}
+
+function ensureSingleFigureMinPadding(figure, img, innerEl, contentEl, minEach = 18) {
+  if (!figure || !img) return;
+  const minTotal = minEach * 2;
+  let guard = 0;
+  while (guard < 10) {
+    guard += 1;
+    const metrics = getMediaRegionMetrics(contentEl, figure);
+    if (!metrics || metrics.extra >= minTotal - 1) return;
+
+    const current = Number.parseFloat(img.style.maxHeight || "0");
+    if (!Number.isFinite(current) || current <= 72) return;
+    const shortage = minTotal - metrics.extra;
+    const next = Math.max(72, Math.floor(current - Math.max(6, shortage / 2)));
+    if (next >= current) return;
+    img.style.maxHeight = `${next}px`;
+    if (slideOverflows(innerEl, contentEl, [figure])) {
+      img.style.maxHeight = `${Math.max(72, next - 8)}px`;
+    }
+  }
+}
+
+function getMediaRegionMetrics(content, mediaBlock) {
+  if (!content || !mediaBlock) return null;
+  const contentRect = content.getBoundingClientRect();
+  const blockRect = mediaBlock.getBoundingClientRect();
+  if (!contentRect.height || !blockRect.height) return null;
+
+  const prev = mediaBlock.previousElementSibling;
+  const next = mediaBlock.nextElementSibling;
+  const regionTop = prev ? prev.getBoundingClientRect().bottom : contentRect.top;
+  const regionBottom = next ? next.getBoundingClientRect().top : contentRect.bottom;
+  const regionHeight = Math.max(0, regionBottom - regionTop);
+
+  const styles = getComputedStyle(mediaBlock);
+  const currentMarginTop = Number.parseFloat(styles.marginTop) || 0;
+  const currentMarginBottom = Number.parseFloat(styles.marginBottom) || 0;
+  const mediaCoreHeight = Math.max(0, blockRect.height - currentMarginTop - currentMarginBottom);
+  const extra = Math.max(0, regionHeight - mediaCoreHeight);
+  return { extra, regionHeight, mediaCoreHeight };
 }
 
 function applyFigureBlockScale(figures, scale) {
