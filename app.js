@@ -470,12 +470,14 @@ function renderSlides(renderOptions) {
         const bodyBlock = document.createElement("div");
         bodyBlock.className = "title-body";
         bodyBlock.innerHTML = renderMarkdown(slide.markdown);
+        highlightCodeBlocks(bodyBlock);
         rewriteImageUrls(bodyBlock, renderOptions, slide);
         groupConsecutiveFigures(bodyBlock);
         content.append(bodyBlock);
       }
     } else {
       content.innerHTML = renderMarkdown(slide.markdown);
+      highlightCodeBlocks(content);
       rewriteImageUrls(content, renderOptions, slide);
       groupConsecutiveFigures(content);
     }
@@ -552,6 +554,22 @@ function renderMarkdown(markdown) {
     return `<pre>${escapeHtml(markdown)}</pre>`;
   }
   return window.marked.parse(markdown);
+}
+
+function highlightCodeBlocks(rootElement) {
+  const codeBlocks = rootElement.querySelectorAll("pre > code");
+  codeBlocks.forEach((code) => {
+    const languageClass = Array.from(code.classList).find((name) => name.startsWith("language-"));
+    const requestedLanguage = languageClass?.slice("language-".length) || "";
+    const canHighlight =
+      window.hljs && (!requestedLanguage || window.hljs.getLanguage(requestedLanguage));
+
+    if (canHighlight) {
+      window.hljs.highlightElement(code);
+    }
+
+    code.parentElement?.classList.add("code-block");
+  });
 }
 
 function rewriteImageUrls(rootElement, renderOptions) {

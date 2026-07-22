@@ -7,6 +7,10 @@
   --accent: #a33d2f;
   --accent-2: #d28f3f;
   --line: #d8cbb6;
+  --code-bg: #27231f;
+  --code-ink: #f8f1e7;
+  --code-muted: #b8aa9a;
+  --code-border: #443b33;
   --shadow: 0 12px 28px rgba(31, 26, 20, 0.12);
   --slide-w: 1280px;
   --slide-h: 720px;
@@ -324,6 +328,91 @@ select {
 
 .slide__content p {
   margin: 0.3em 0 0.25em;
+}
+
+.slide__content :not(pre) > code {
+  padding: 0.08em 0.32em;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+  border-radius: 0.28em;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  color: var(--accent);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.9em;
+}
+
+.slide__content pre.code-block,
+.slide__content pre {
+  margin: 0.45em 0 0.65em;
+  padding: 0.72em 0.9em;
+  overflow: auto;
+  border: 1px solid var(--code-border);
+  border-radius: 10px;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  font-size: calc(0.78rem * var(--body-scale) * var(--global-type-scale));
+  line-height: 1.45;
+  tab-size: 2;
+}
+
+.slide__content pre code {
+  display: block;
+  min-width: max-content;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: inherit;
+}
+
+/* highlight.js tokens, tuned to the viewer's warm presentation theme. */
+.slide__content .hljs-comment,
+.slide__content .hljs-quote {
+  color: var(--code-muted);
+  font-style: italic;
+}
+
+.slide__content .hljs-keyword,
+.slide__content .hljs-selector-tag,
+.slide__content .hljs-literal,
+.slide__content .hljs-section,
+.slide__content .hljs-link {
+  color: #f08d7e;
+}
+
+.slide__content .hljs-string,
+.slide__content .hljs-title,
+.slide__content .hljs-name,
+.slide__content .hljs-type,
+.slide__content .hljs-attribute,
+.slide__content .hljs-symbol,
+.slide__content .hljs-bullet,
+.slide__content .hljs-addition {
+  color: #e8bd70;
+}
+
+.slide__content .hljs-number,
+.slide__content .hljs-built_in,
+.slide__content .hljs-variable,
+.slide__content .hljs-template-variable,
+.slide__content .hljs-selector-class,
+.slide__content .hljs-selector-attr {
+  color: #91c9bd;
+}
+
+.slide__content .hljs-meta,
+.slide__content .hljs-doctag,
+.slide__content .hljs-regexp,
+.slide__content .hljs-deletion {
+  color: #cf9dcc;
+}
+
+.slide__content .hljs-emphasis {
+  font-style: italic;
+}
+
+.slide__content .hljs-strong {
+  font-weight: 700;
 }
 
 .slide__content ul,
